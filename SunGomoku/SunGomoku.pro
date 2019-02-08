@@ -26,13 +26,16 @@ CONFIG += c++11
 
 SOURCES += \
         main.cpp \
-        xrhall.cpp
+        xrhall.cpp \
+    xrroom.cpp
 
 HEADERS += \
-        xrhall.h
+        xrhall.h \
+    xrroom.h
 
 FORMS += \
-        xrhall.ui
+        xrhall.ui \
+    xrroom.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
