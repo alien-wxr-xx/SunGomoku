@@ -27,17 +27,26 @@ CONFIG += c++11
 SOURCES += \
         main.cpp \
         xrhall.cpp \
-    xrroom.cpp
+    xrroom.cpp \
+    xrUI/xrhall.cpp \
+    xrUI/xrroom.cpp \
+    main.cpp
 
 HEADERS += \
-        xrhall.h \
-    xrroom.h
+    xrroom.h \
+    xrUI/xrhall.h \
+    xrUI/xrroom.h
 
 FORMS += \
         xrhall.ui \
-    xrroom.ui
+    xrroom.ui \
+    xrUI/xrhall.ui \
+    xrUI/xrroom.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+SUBDIRS += \
+    SunGomoku.pro
