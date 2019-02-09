@@ -60,7 +60,8 @@ SOURCES       = ../SunGomoku/main.cpp \
 		../SunGomoku/Kernel/book.c \
 		../SunGomoku/Kernel/search.c \
 		../SunGomoku/Kernel/tree.c \
-		../SunGomoku/Kernel/uiinc.c qrc_myicon.cpp \
+		../SunGomoku/Kernel/uiinc.c \
+		../SunGomoku/xrUI/xrtemp.cpp qrc_myicon.cpp \
 		moc_xrhall.cpp \
 		moc_xrroom.cpp
 OBJECTS       = main.o \
@@ -72,6 +73,7 @@ OBJECTS       = main.o \
 		search.o \
 		tree.o \
 		uiinc.o \
+		xrtemp.o \
 		qrc_myicon.o \
 		moc_xrhall.o \
 		moc_xrroom.o
@@ -302,7 +304,8 @@ DIST          = ../SunGomoku/opening/d11-1.lib \
 		../SunGomoku/Kernel/uiinc.h \
 		../SunGomoku/xrUI/chessboard.h \
 		../SunGomoku/xrUI/xrhall.h \
-		../SunGomoku/xrUI/xrroom.h ../SunGomoku/main.cpp \
+		../SunGomoku/xrUI/xrroom.h \
+		../SunGomoku/xrUI/xrtemp.h ../SunGomoku/main.cpp \
 		../SunGomoku/xrUI/chessboard.cpp \
 		../SunGomoku/xrUI/xrhall.cpp \
 		../SunGomoku/xrUI/xrroom.cpp \
@@ -310,7 +313,8 @@ DIST          = ../SunGomoku/opening/d11-1.lib \
 		../SunGomoku/Kernel/book.c \
 		../SunGomoku/Kernel/search.c \
 		../SunGomoku/Kernel/tree.c \
-		../SunGomoku/Kernel/uiinc.c
+		../SunGomoku/Kernel/uiinc.c \
+		../SunGomoku/xrUI/xrtemp.cpp
 QMAKE_TARGET  = SunGomoku
 DESTDIR       = 
 TARGET        = SunGomoku.app/Contents/MacOS/SunGomoku
@@ -752,8 +756,8 @@ distdir: FORCE
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents ../SunGomoku/Resources/myicon.qrc $(DISTDIR)/
 	$(COPY_FILE) --parents ../../../../Qt/5.12.1/clang_64/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents ../SunGomoku/Kernel/board.h ../SunGomoku/Kernel/book.h ../SunGomoku/Kernel/key.h ../SunGomoku/Kernel/macro.h ../SunGomoku/Kernel/mvlist.h ../SunGomoku/Kernel/pattern.h ../SunGomoku/Kernel/search.h ../SunGomoku/Kernel/tree.h ../SunGomoku/Kernel/uiinc.h ../SunGomoku/xrUI/chessboard.h ../SunGomoku/xrUI/xrhall.h ../SunGomoku/xrUI/xrroom.h $(DISTDIR)/
-	$(COPY_FILE) --parents ../SunGomoku/main.cpp ../SunGomoku/xrUI/chessboard.cpp ../SunGomoku/xrUI/xrhall.cpp ../SunGomoku/xrUI/xrroom.cpp ../SunGomoku/Kernel/board.c ../SunGomoku/Kernel/book.c ../SunGomoku/Kernel/search.c ../SunGomoku/Kernel/tree.c ../SunGomoku/Kernel/uiinc.c $(DISTDIR)/
+	$(COPY_FILE) --parents ../SunGomoku/Kernel/board.h ../SunGomoku/Kernel/book.h ../SunGomoku/Kernel/key.h ../SunGomoku/Kernel/macro.h ../SunGomoku/Kernel/mvlist.h ../SunGomoku/Kernel/pattern.h ../SunGomoku/Kernel/search.h ../SunGomoku/Kernel/tree.h ../SunGomoku/Kernel/uiinc.h ../SunGomoku/xrUI/chessboard.h ../SunGomoku/xrUI/xrhall.h ../SunGomoku/xrUI/xrroom.h ../SunGomoku/xrUI/xrtemp.h $(DISTDIR)/
+	$(COPY_FILE) --parents ../SunGomoku/main.cpp ../SunGomoku/xrUI/chessboard.cpp ../SunGomoku/xrUI/xrhall.cpp ../SunGomoku/xrUI/xrroom.cpp ../SunGomoku/Kernel/board.c ../SunGomoku/Kernel/book.c ../SunGomoku/Kernel/search.c ../SunGomoku/Kernel/tree.c ../SunGomoku/Kernel/uiinc.c ../SunGomoku/xrUI/xrtemp.cpp $(DISTDIR)/
 	$(COPY_FILE) --parents ../SunGomoku/xrUI/xrhall.ui ../SunGomoku/xrUI/xrroom.ui $(DISTDIR)/
 
 
@@ -877,7 +881,28 @@ compiler_clean: compiler_rcc_clean compiler_moc_predefs_clean compiler_moc_heade
 
 ####### Compile
 
-main.o: ../SunGomoku/main.cpp ../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QApplication \
+main.o: ../SunGomoku/main.cpp ../SunGomoku/xrUI/xrhall.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QWidget \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/qwidget.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QButtonGroup \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/qbuttongroup.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QString \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qstring.h \
+		../SunGomoku/xrUI/xrroom.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QMainWindow \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/qmainwindow.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtGui.framework/Headers/QMouseEvent \
+		../../../../Qt/5.12.1/clang_64/lib/QtGui.framework/Headers/qevent.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QTime \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qdatetime.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QtGlobal \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qglobal.h \
+		../SunGomoku/xrUI/chessboard.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QPoint \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qpoint.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QVector \
+		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qvector.h \
+		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QApplication \
 		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/qapplication.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o ../SunGomoku/main.cpp
 
@@ -910,8 +935,8 @@ xrhall.o: ../SunGomoku/xrUI/xrhall.cpp ../SunGomoku/xrUI/xrhall.h \
 		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QVector \
 		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qvector.h \
 		ui_xrhall.h \
-		../SunGomoku/kernel/uiinc.h \
-		../SunGomoku/kernel/macro.h
+		../SunGomoku/Kernel/uiinc.h \
+		../SunGomoku/Kernel/macro.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o xrhall.o ../SunGomoku/xrUI/xrhall.cpp
 
 xrroom.o: ../SunGomoku/xrUI/xrroom.cpp ../SunGomoku/xrUI/xrroom.h \
@@ -931,8 +956,8 @@ xrroom.o: ../SunGomoku/xrUI/xrroom.cpp ../SunGomoku/xrUI/xrroom.h \
 		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/QVector \
 		../../../../Qt/5.12.1/clang_64/lib/QtCore.framework/Headers/qvector.h \
 		ui_xrroom.h \
-		../SunGomoku/kernel/uiinc.h \
-		../SunGomoku/kernel/macro.h \
+		../SunGomoku/Kernel/uiinc.h \
+		../SunGomoku/Kernel/macro.h \
 		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/QLabel \
 		../../../../Qt/5.12.1/clang_64/lib/QtWidgets.framework/Headers/qlabel.h \
 		../../../../Qt/5.12.1/clang_64/lib/QtGui.framework/Headers/QPainter \
@@ -984,6 +1009,9 @@ uiinc.o: ../SunGomoku/Kernel/uiinc.c ../SunGomoku/Kernel/uiinc.h \
 		../SunGomoku/Kernel/search.h \
 		../SunGomoku/Kernel/book.h
 	$(CC) -c $(CFLAGS) $(INCPATH) -o uiinc.o ../SunGomoku/Kernel/uiinc.c
+
+xrtemp.o: ../SunGomoku/xrUI/xrtemp.cpp ../SunGomoku/xrUI/xrtemp.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o xrtemp.o ../SunGomoku/xrUI/xrtemp.cpp
 
 qrc_myicon.o: qrc_myicon.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o qrc_myicon.o qrc_myicon.cpp

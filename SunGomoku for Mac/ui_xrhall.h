@@ -40,7 +40,7 @@ public:
     {
         if (xrHall->objectName().isEmpty())
             xrHall->setObjectName(QString::fromUtf8("xrHall"));
-        xrHall->resize(619, 487);
+        xrHall->resize(436, 340);
         gridLayout_2 = new QGridLayout(xrHall);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
         logoLabel = new QLabel(xrHall);
