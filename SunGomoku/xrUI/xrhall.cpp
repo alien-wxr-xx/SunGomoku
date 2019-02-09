@@ -13,7 +13,7 @@ xrHall::xrHall(QWidget *parent) :
 
     this->setWindowTitle("Welcome to SunGomoku!");
 
-    vtext = "AI 1.1.3, UI 1.3.3 beta";
+    vtext = "AI v1.1.3, UI v1.4-beta2";
     ui->versionLabel->setText(vtext);
     ui->versionLabel->setAlignment(Qt::AlignCenter);
 
