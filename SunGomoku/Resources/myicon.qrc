@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/myimages">
+        <file>restartV2.icns</file>
+        <file>undoV2.icns</file>
+        <file>bigLogo.png</file>
+    </qresource>
+</RCC>

@@ -1,10 +1,13 @@
 #-------------------------------------------------
 #
-# Project created by QtCreator 2019-02-08T17:52:28
+# Project created by QtCreator 2019-01-11T20:33:31
 #
 #-------------------------------------------------
 
 QT       += core gui
+ICON      = Resources/SunGomokuMac.icns
+RC_ICONS  = Resources/SunGomokuWin.ico
+
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -26,20 +29,30 @@ CONFIG += c++11
 
 SOURCES += \
         main.cpp \
-        xrhall.cpp \
-    xrroom.cpp \
+    xrUI/chessboard.cpp \
     xrUI/xrhall.cpp \
     xrUI/xrroom.cpp \
-    main.cpp
+    Kernel/board.c \
+    Kernel/book.c \
+    Kernel/search.c \
+    Kernel/tree.c \
+    Kernel/uiinc.c
 
 HEADERS += \
-    xrroom.h \
+    Kernel/board.h \
+    Kernel/book.h \
+    Kernel/key.h \
+    Kernel/macro.h \
+    Kernel/mvlist.h \
+    Kernel/pattern.h \
+    Kernel/search.h \
+    Kernel/tree.h \
+    Kernel/uiinc.h \
+    xrUI/chessboard.h \
     xrUI/xrhall.h \
     xrUI/xrroom.h
 
 FORMS += \
-        xrhall.ui \
-    xrroom.ui \
     xrUI/xrhall.ui \
     xrUI/xrroom.ui
 
@@ -47,6 +60,43 @@ FORMS += \
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
+
+DISTFILES += \
+    opening/d11-1.lib \
+    opening/d4-2.lib \
+    opening/id12-1.lib \
+    opening/id7-2.lib \
+    opening/d10-1.lib \
+    opening/d11-1.lib \
+    opening/d12-1.lib \
+    opening/d4-2.lib \
+    opening/d5-1.lib \
+    opening/d8-1.lib \
+    opening/id10-2.lib \
+    opening/id12-1.lib \
+    opening/id4-2.lib \
+    opening/id7-2.lib \
+    opening/id9-1.lib \
+    Opening/d10-1.lib \
+    Opening/d11-1.lib \
+    Opening/d12-1.lib \
+    Opening/d4-2.lib \
+    Opening/d5-1.lib \
+    Opening/d8-1.lib \
+    Opening/id10-2.lib \
+    Opening/id12-1.lib \
+    Opening/id4-2.lib \
+    Opening/id9-1.lib \
+    Resources/bigLogo.png \
+    Resources/SunGomokuWin.ico \
+    Resources/restartV2.icns \
+    Resources/SunGomokuMac.icns \
+    Resources/undoV2.icns
+
+RESOURCES += \
+    Resources/myicon.qrc
+
+QMAKE_CXXFLAGS_RELEASE += -O3       # Release -O3
 
 SUBDIRS += \
     SunGomoku.pro
