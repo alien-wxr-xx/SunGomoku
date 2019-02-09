@@ -36,7 +36,8 @@ SOURCES += \
     Kernel/book.c \
     Kernel/search.c \
     Kernel/tree.c \
-    Kernel/uiinc.c
+    Kernel/uiinc.c \
+    xrUI/xrtemp.cpp
 
 HEADERS += \
     Kernel/board.h \
@@ -50,7 +51,8 @@ HEADERS += \
     Kernel/uiinc.h \
     xrUI/chessboard.h \
     xrUI/xrhall.h \
-    xrUI/xrroom.h
+    xrUI/xrroom.h \
+    xrUI/xrtemp.h
 
 FORMS += \
     xrUI/xrhall.ui \
