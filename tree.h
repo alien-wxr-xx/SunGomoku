@@ -3,11 +3,11 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
- * tree.h - opening book tree implementation
+ * tree.h - opening tree implementation
  *
- * Notice: the root node of this tree data structure is H8.
+ * Notice: the root node of this tree is H8.
  */
 
 #ifndef __TREE_H__

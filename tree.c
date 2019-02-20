@@ -3,9 +3,9 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
- * tree.c - opening book tree implementation
+ * tree.c - opening tree implementation
  */
 
 #include "tree.h" 

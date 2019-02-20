@@ -3,6 +3,8 @@
 CC = gcc
 MAINSRCS = main.c
 
+OTHSRCS += table.c
+OTHSRCS += pair.c
 OTHSRCS += board.c
 OTHSRCS += tree.c
 OTHSRCS += book.c
@@ -12,6 +14,8 @@ OTHSRCS += uiinc.c
 HEADERS += macro.h
 HEADERS += pattern.h
 HEADERS += mvlist.h
+HEADERS += table.h
+HEADERS += pair.h
 HEADERS += board.h
 HEADERS += key.h
 HEADERS += tree.h

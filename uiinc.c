@@ -3,7 +3,7 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
  * uiinc.c - interface functions for ui
  */
@@ -20,26 +20,24 @@ static board_t Board;
 
 search_t Srh = {
 	.sc = {
-		.win = WIN,
-		.lose = LOSE,
-		.free4 = 4320,
+		.free4 = 5000,
 		.dead4 = 882,
 		.free3 = 630,
-		.dead3 = 294,
+		.dead3 = 210,
 		.free2 = 210,
-		.dead2 = 42,
-		.free1 = 30,
+		.dead2 = 25,
+		.free1 = 25,
 		.dead1 = 1,
 		.free3a = 693,
 		.free2a = 231,
-		.free1a = 33
+		.free1a = 27
 	},
-	.me = BLACK,
-	.opp = WHITE,
-	.leaf = 10,
+	.hpleaf = 16,
+	.htleaf = 10,
 	.dep = 10,
+	.tlimit = 3,
 	.presrh = true,
-	.book = true
+	.book = false
 };
 
 void initialize()

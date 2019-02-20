@@ -3,162 +3,116 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
- * search.c - implementation of heuristic searching
+ * search.c - heuristic search functions
  */
 
 #include "search.h"
 #include "macro.h"
+#include "pair.h"
 #include "board.h"
 #include "book.h"
 
 extern bool isForbidden;
 static bool BookInUse = false;	// set if the opening book is in use.
 
-/*******************************************************************************
-							Helper variable and functions
-*******************************************************************************/
-// pos-key pair structure
-typedef struct {
-	u8 pos;
-	long key;
-} pair_t;
+static pair_t Pair;
+static clock_t OriginTime, CurrentTime;
 
-// position potential array
-static u8 pot[15 * 15] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
-	0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0,
-	0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 5, 6, 6, 6, 5, 4, 3, 2, 1, 0,
-	0, 1 ,2, 3, 4, 5, 6, 7, 6, 5, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 5, 6, 6, 6, 5, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 3, 2, 1, 0,
-	0, 1, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 1, 0,
-	0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 0,
-	0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-// return true if a < b
-static inline bool less(pair_t* a, pair_t* b)
-{
-	if(a->key < b->key)
-		return true;
-	else if(a->key > b->key)
-		return false;
-	else
-	{
-		if(pot[a->pos] < pot[b->pos])
-			return true;
-		else
-			return false;
-	}
-}
-
-// sort first N elements of a pair_t array descending
-static void pair_sort(pair_t* arr, u8 N)
-{
-	int i, j;
-	pair_t tmp;
-
-	for(i = 1; i < N; i++)
-	{
-		for(j = i - 1; j >= 0; j--)
-		{
-			if(less(&arr[j], &arr[j + 1]))
-			{
-				tmp.pos = arr[j].pos;
-				tmp.key = arr[j].key;
-				arr[j].pos = arr[j + 1].pos;
-				arr[j].key = arr[j + 1].key;
-				arr[j + 1].pos = tmp.pos;
-				arr[j + 1].key = tmp.key;
-			}
-			else
-				break;
-		}
-	}
-}
-
-/*******************************************************************************
-								Heuristic functions
-*******************************************************************************/
-long evaluate(const board_t* bd, const score_t* sc, const u8 color)
+long evaluate(const board_t* bd, const score_t* sc,	const u8 me, 
+													const u8 opp, const u8 next)
 {
 	long score = 0;
 	u8 win = board_gameover(bd);
 
-	if(color == BLACK)
+	if(me == BLACK)
 	{
 		if(win == BLACK)
-			return sc->win;
+			return WIN;
 		else if(win == WHITE)
-			return sc->lose;
+			return LOSE;
 		else if(win == DRAW)
 			return 0;
 	}
-	else if(color == WHITE)
+	else if(me == WHITE)
 	{
 		if(win == BLACK)
-			return sc->lose;
+			return LOSE;
 		else if(win == WHITE)
-			return sc->win;
+			return WIN;
 		else if(win == DRAW)
 			return 0;
 	}
-	else
-		return INVALID;
 
-	score += sc->free4 * pattern_read(pat(bd), FREE4, BLACK);
-	score += sc->dead4 * pattern_read(pat(bd), DEAD4, BLACK);
-	score += sc->free3 * pattern_read(pat(bd), FREE3, BLACK);
-	score += sc->dead3 * pattern_read(pat(bd), DEAD3, BLACK);
-	score += sc->free2 * pattern_read(pat(bd), FREE2, BLACK);
-	score += sc->dead2 * pattern_read(pat(bd), DEAD2, BLACK);
-	score += sc->free1 * pattern_read(pat(bd), FREE1, BLACK);
-	score += sc->dead1 * pattern_read(pat(bd), DEAD1, BLACK);
-	score += sc->free3a * pattern_read(pat(bd), FREE3a, BLACK);
-	score += sc->free2a * pattern_read(pat(bd), FREE2a, BLACK);
-	score += sc->free1a * pattern_read(pat(bd), FREE1a, BLACK);
+	if(next == me)
+	{
+		score += 10000      * pattern_read(pat(bd), FREE4, me);
+		score += 10000      * pattern_read(pat(bd), DEAD4, me);
+		score += 5000       * pattern_read(pat(bd), FREE3, me);
+		score += sc->dead3  * pattern_read(pat(bd), DEAD3, me);
+		score += sc->free2  * pattern_read(pat(bd), FREE2, me);
+		score += sc->dead2  * pattern_read(pat(bd), DEAD2, me);
+		score += sc->free1  * pattern_read(pat(bd), FREE1, me);
+		score += sc->dead1  * pattern_read(pat(bd), DEAD1, me);
+		score += 5000       * pattern_read(pat(bd), FREE3a, me);
+		score += sc->free2a * pattern_read(pat(bd), FREE2a, me);
+		score += sc->free1a * pattern_read(pat(bd), FREE1a, me);
 
-	score -= sc->free4 * pattern_read(pat(bd), FREE4, WHITE);
-	score -= sc->dead4 * pattern_read(pat(bd), DEAD4, WHITE);
-	score -= sc->free3 * pattern_read(pat(bd), FREE3, WHITE);
-	score -= sc->dead3 * pattern_read(pat(bd), DEAD3, WHITE);
-	score -= sc->free2 * pattern_read(pat(bd), FREE2, WHITE);
-	score -= sc->dead2 * pattern_read(pat(bd), DEAD2, WHITE);
-	score -= sc->free1 * pattern_read(pat(bd), FREE1, WHITE);
-	score -= sc->dead1 * pattern_read(pat(bd), DEAD1, WHITE);
-	score -= sc->free3a * pattern_read(pat(bd), FREE3a, WHITE);
-	score -= sc->free2a * pattern_read(pat(bd), FREE2a, WHITE);
-	score -= sc->free1a * pattern_read(pat(bd), FREE1a, WHITE);
+		score -= sc->free4  * pattern_read(pat(bd), FREE4, opp);
+		score -= sc->dead4  * pattern_read(pat(bd), DEAD4, opp);
+		score -= sc->free3  * pattern_read(pat(bd), FREE3, opp);
+		score -= sc->dead3  * pattern_read(pat(bd), DEAD3, opp);
+		score -= sc->free2  * pattern_read(pat(bd), FREE2, opp);
+		score -= sc->dead2  * pattern_read(pat(bd), DEAD2, opp);
+		score -= sc->free1  * pattern_read(pat(bd), FREE1, opp);
+		score -= sc->dead1  * pattern_read(pat(bd), DEAD1, opp);
+		score -= sc->free3a * pattern_read(pat(bd), FREE3a, opp);
+		score -= sc->free2a * pattern_read(pat(bd), FREE2a, opp);
+		score -= sc->free1a * pattern_read(pat(bd), FREE1a, opp);
+	}
+	else if(next == opp)
+	{
+		score += sc->free4  * pattern_read(pat(bd), FREE4, me);
+		score += sc->dead4  * pattern_read(pat(bd), DEAD4, me);
+		score += sc->free3  * pattern_read(pat(bd), FREE3, me);
+		score += sc->dead3  * pattern_read(pat(bd), DEAD3, me);
+		score += sc->free2  * pattern_read(pat(bd), FREE2, me);
+		score += sc->dead2  * pattern_read(pat(bd), DEAD2, me);
+		score += sc->free1  * pattern_read(pat(bd), FREE1, me);
+		score += sc->dead1  * pattern_read(pat(bd), DEAD1, me);
+		score += sc->free3a * pattern_read(pat(bd), FREE3a, me);
+		score += sc->free2a * pattern_read(pat(bd), FREE2a, me);
+		score += sc->free1a * pattern_read(pat(bd), FREE1a, me);
 
-	if(color == BLACK)
-		return score;
-	else if(color == WHITE)
-		return -score;
-
-	return INVALID;
+		score -= 10000      * pattern_read(pat(bd), FREE4, opp);
+		score -= 10000      * pattern_read(pat(bd), DEAD4, opp);
+		score -= 5000       * pattern_read(pat(bd), FREE3, opp);
+		score -= sc->dead3  * pattern_read(pat(bd), DEAD3, opp);
+		score -= sc->free2  * pattern_read(pat(bd), FREE2, opp);
+		score -= sc->dead2  * pattern_read(pat(bd), DEAD2, opp);
+		score -= sc->free1  * pattern_read(pat(bd), FREE1, opp);
+		score -= sc->dead1  * pattern_read(pat(bd), DEAD1, opp);
+		score -= 5000       * pattern_read(pat(bd), FREE3a, opp);
+		score -= sc->free2a * pattern_read(pat(bd), FREE2a, opp);
+		score -= sc->free1a * pattern_read(pat(bd), FREE1a, opp);
+	}
+	
+	return score;
 }
 
 /*
  * Generate must-do moves in hlist(bd).
  *
- * @param [out]	bd		The hlist member of bd is changed.
- * @param [in]	me		My color.
- * @param [in]	opp		Opponent's color.
+ * @param [out]	bd		Pointer to board_t structure
+ * @param [in]	me		Next move color
+ * @param [in]	opp		The other color.
  */
 static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 {
 	u8 pos;
 
-	// me has four so game ends next turn and only choose one place to win
-	// notice: black shouldn't become long.
+	// me has free4 or dead4, choose one position to win
 	if(pattern_read(pat(bd), FREE4, me) || pattern_read(pat(bd), DEAD4, me))
 	{
 		pos = mvlist_first(mlist(bd));
@@ -172,7 +126,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 				{
 					if(pattern_read(hpinc(bd), FIVE, me))
 					{
-						mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+						mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
 						undo(bd);
 						return true;
 					}
@@ -182,7 +136,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 					if(pattern_read(hpinc(bd), FIVE, me)
 					|| pattern_read(hpinc(bd), LONG, me))
 					{
-						mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+						mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
 						undo(bd);
 						return true;
 					}
@@ -193,7 +147,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 				if(pattern_read(hpinc(bd), FIVE, me)
 				|| pattern_read(hpinc(bd), LONG, me))
 				{
-					mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+					mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
 					undo(bd);
 					return true;
 				}
@@ -204,8 +158,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 		}
 	}
 
-	// opp has free4 and me has no four so me loses next turn
-	// only choose one place
+	// opp has free4 and me has no four, choose one position to lose
 	if(pattern_read(pat(bd), FREE4, opp))
 	{
 		pos = mvlist_first(mlist(bd));
@@ -215,7 +168,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 
 			if(pattern_read(hpinc(bd), FREE4, opp) < 0)
 			{
-				mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+				mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
 				undo(bd);
 				return true;
 			}
@@ -225,8 +178,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 		}
 	}
 
-	// opp has dead4 and me has no four so me must defend
-	// me has only one choice in this case
+	// opp has dead4 and me has no four, me must defend
 	if(pattern_read(pat(bd), DEAD4, opp))
 	{
 		pos = mvlist_first(mlist(bd));
@@ -236,7 +188,7 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 
 			if(pattern_read(hpinc(bd), DEAD4, opp) < 0)
 			{
-				mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+				mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
 				undo(bd);
 				return true;
 			}
@@ -245,17 +197,64 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 			pos = mvlist_next(mlist(bd), pos);
 		}
 	}
-	
-	// opp has free3 and both have no four so me must defend
-	if(pattern_read(pat(bd), FREE3, opp) || pattern_read(pat(bd), FREE3a, opp))
+
+	// me has free3 and both have no four, me can form free4
+	// consider forbidden points for black
+	if(pattern_read(pat(bd), FREE3, me) || pattern_read(pat(bd), FREE3a, me))
 	{
 		pos = mvlist_first(mlist(bd));
 		while(pos != END)
 		{
 			do_move_no_mvlist(bd, pos, me);
 
-			if(pattern_read(hpinc(bd), FREE4, me) > 0)
-				mvlist_insert_front(&bd->hlist[bd->num - 1], pos);
+			if(isForbidden)
+			{
+				if(me == BLACK)
+				{
+					if(pattern_read(hpinc(bd), FREE4, me) > 0
+					&& (pattern_read(hpinc(bd), FREE4, me) 
+					+ pattern_read(hpinc(bd), DEAD4, me) < 2)
+					&& (pattern_read(hpinc(bd), FREE3, me) 
+					+ pattern_read(hpinc(bd), FREE3a, me) < 2))
+					{
+						mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
+						undo(bd);
+						return true;
+					}
+				}
+				else if(me == WHITE)
+				{
+					if(pattern_read(hpinc(bd), FREE4, me) > 0)
+					{
+						mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
+						undo(bd);
+						return true;
+					}
+				}
+			}
+			else
+			{
+				if(pattern_read(hpinc(bd), FREE4, me) > 0)
+				{
+					mvlist_insert_back(&bd->hlist[bd->num - 1], pos);
+					undo(bd);
+					return true;
+				}
+			}
+
+			undo(bd);
+			pos = mvlist_next(mlist(bd), pos);
+		}
+	}
+
+	// opp has free3 and me has no free3 and both have no four
+	// me must form dead4 or defend
+	if(pattern_read(pat(bd), FREE3, opp) || pattern_read(pat(bd), FREE3a, opp))
+	{
+		pos = mvlist_first(mlist(bd));
+		while(pos != END)
+		{
+			do_move_no_mvlist(bd, pos, me);
 
 			if((pattern_read(hpinc(bd),FREE3,opp)+pattern_read(hpinc(bd),FREE3a,opp)<0)
 			|| (pattern_read(hpinc(bd),DEAD4,me) > 0))
@@ -272,97 +271,95 @@ static bool must_do_generate(board_t* bd, const u8 me, const u8 opp)
 
 void heuristic_generate(board_t* bd, const search_t* srh, const u8 me, const u8 opp)
 {
-	pair_t pair[15 * 15];
-	u8 pos, i, cnt = 0;
+	pair_t pair;
+	u8 pos, i;
 
 	mvlist_remove_all(hlist(bd));
+
+	if(bd->num == 0)
+	{
+		mvlist_insert_front(hlist(bd), 112);
+		return;
+	}
 
 	if(must_do_generate(bd, me, opp))
 		return;
 
-	if(bd->num == 0)
-		mvlist_insert_front(hlist(bd), 112);
+	pair_reset(&pair);
 
-	// generate helper array
 	pos = mvlist_first(mlist(bd));
 	while(pos != END)
 	{
 		do_move_no_mvlist(bd, pos, me);
-		pair[cnt].pos = pos;
-		pair[cnt++].key = evaluate(bd, &srh->sc, me);
+		pair_insert(&pair, pos, evaluate(bd, &srh->sc, me, opp, opp));
 		undo(bd);
 		pos = mvlist_next(mlist(bd), pos);
 	}
 	
-	// sort pair_t array descending
-	pair_sort(pair, cnt);
-	if(cnt < srh->leaf)
-	{
-		for(i = 0; i < cnt; i++)
-			mvlist_insert_back(hlist(bd), pair[i].pos);
-	}
+	pair_sort(&pair);
+
+	if(pair.cnt < srh->htleaf)
+		for(i = 0; i < pair.cnt; i++)
+			mvlist_insert_back(hlist(bd), pair.arr[i].pos);
 	else
-	{
-		for(i = 0; i < srh->leaf; i++)
-			mvlist_insert_back(hlist(bd), pair[i].pos);
-	}
+		for(i = 0; i < srh->htleaf; i++)
+			mvlist_insert_back(hlist(bd), pair.arr[i].pos);
 }
 
-static void heuristic_generate_root(board_t* bd, const search_t* srh,
+// Notice: this function will mess up pinc(bd).
+void heuristic_generate_root(board_t* bd, const search_t* srh,
 							const u8 dep, const u8 me, const u8 opp)
 {
-	pair_t pair[15 * 15];
-	u8 pos, i, cnt = 0;
+	pair_t pair;
+	u8 pos, i;
 
 	mvlist_remove_all(hlist(bd));
+
+	if(bd->num == 0)
+	{
+		mvlist_insert_front(hlist(bd), 112);
+		return;
+	}
 
 	if(must_do_generate(bd, me, opp))
 		return;
 
-	if(bd->num == 0)
-		mvlist_insert_front(hlist(bd), 112);
+	pair_reset(&pair);
 
-	// generate helper array
 	pos = mvlist_first(mlist(bd));
 	while(pos != END)
 	{
 		do_move(bd, pos, me);
-		pair[cnt].pos = pos;
-		// here different from the former function
-		pair[cnt++].key = alphabeta(bd, srh, dep - 1, opp, LOSE - 1, WIN + 1, &i, 1);
+		pair_insert(&pair, pos, alphabeta(bd, srh, dep-1, opp, LOSE-1, WIN+1, &i, 1));
 		undo(bd);
 		pos = mvlist_next(mlist(bd), pos);
 	}
-	
-	// sort pair_t array descending
-	pair_sort(pair, cnt);
-	if(cnt < srh->leaf)
-	{
-		for(i = 0; i < cnt; i++)
-			mvlist_insert_back(hlist(bd), pair[i].pos);
-	}
+
+	pair_sort(&pair);
+
+	if(pair.cnt < srh->hpleaf)
+		for(i = 0; i < pair.cnt; i++)
+			mvlist_insert_back(hlist(bd), pair.arr[i].pos);
 	else
-	{
-		for(i = 0; i < srh->leaf; i++)
-			mvlist_insert_back(hlist(bd), pair[i].pos);
-	}
+		for(i = 0; i < srh->hpleaf; i++)
+			mvlist_insert_back(hlist(bd), pair.arr[i].pos);
 }
 
-long alphabeta(board_t* bd, const search_t* srh, const u8 dep, 
-				const u8 next, long alpha, long beta, u8* best, const bool heu)
+long alphabeta(board_t* bd, const search_t* srh, u8 dep, const u8 next,
+						long alpha, long beta, u8* best, const bool heu)
 {
 	long val;
 	u8 pos, tmp;
 	tmp = board_gameover(bd);
 
 	if(tmp == srh->me)
-		return srh->sc.win - bd->num;
+		return WIN - bd->num;
 	if(tmp == srh->opp)
-		return srh->sc.lose + bd->num;
+		return LOSE + bd->num;
 	if(tmp == DRAW)
 		return 0;
 	if(dep <= 0)
-		return evaluate(bd, &srh->sc, srh->me);
+		return evaluate(bd, &srh->sc, srh->me, srh->opp, srh->me);
 
 	// min node
 	if(next == srh->opp)
@@ -381,7 +378,7 @@ long alphabeta(board_t* bd, const search_t* srh, const u8 dep,
 			if(dep > 1)
 				do_move(bd, pos, srh->opp);
 			else
-				do_move_no_mvlist(bd, pos, srh->opp);
+				do_move_no_mvlist_pinc(bd, pos, srh->opp);
 
 			val = alphabeta(bd, srh, dep - 1, srh->me, alpha, beta, &tmp, 1);
 			undo(bd);
@@ -419,9 +416,11 @@ long alphabeta(board_t* bd, const search_t* srh, const u8 dep,
 			if(dep > 1)
 				do_move(bd, pos, srh->me);
 			else
-				do_move_no_mvlist(bd, pos, srh->me);
+				do_move_no_mvlist_pinc(bd, pos, srh->me);
 
 			val = alphabeta(bd, srh, dep - 1, srh->opp,	alpha, beta, &tmp, 1);
+			if(!heu)
+				pair_insert(&Pair, pos, val);
 			undo(bd);
 
 			if(val > alpha)
@@ -439,12 +438,114 @@ long alphabeta(board_t* bd, const search_t* srh, const u8 dep,
 		}
 		return alpha;
 	}
-	return 0;
+	return INVALID;
+}
+
+long alphabeta_time(board_t* bd, const search_t* srh, u8 dep, const u8 next,
+							long alpha, long beta, u8* best, const bool heu)
+{
+	// timeout check
+	CurrentTime = clock();
+	if(CurrentTime - OriginTime >= srh->tlimit * CLOCKS_PER_SEC)
+		return LOSE;
+
+	// gameover check
+	long val;
+	u8 pos, tmp;
+	tmp = board_gameover(bd);
+
+	if(tmp == srh->me)
+		return WIN - bd->num;
+	if(tmp == srh->opp)
+		return LOSE + bd->num;
+	if(tmp == DRAW)
+		return 0;
+	if(dep <= 0)
+		return evaluate(bd, &srh->sc, srh->me, srh->opp, srh->me);
+
+	// min node
+	if(next == srh->opp)
+	{
+		if(dep > 1)
+		{
+			if(heu)
+				heuristic_generate(bd, srh, srh->opp, srh->me);
+			pos = mvlist_first(hlist(bd));
+		}
+		else
+			pos = mvlist_first(mlist(bd));
+
+		while(pos != END)
+		{
+			if(dep > 1)
+				do_move(bd, pos, srh->opp);
+			else
+				do_move_no_mvlist_pinc(bd, pos, srh->opp);
+
+			val = alphabeta_time(bd, srh, dep - 1, srh->me, alpha, beta, &tmp, 1);
+			undo(bd);
+
+			if(val < beta)
+			{
+				beta = val;
+				*best = pos;
+			}
+			if(beta <= alpha)
+				break;
+
+			if(dep > 1)
+				pos = mvlist_next(hlist(bd), pos);
+			else
+				pos = mvlist_next(mlist(bd), pos);
+		}
+		return beta;
+	}
+
+	// max node	
+	if(next == srh->me)
+	{
+		if(dep > 1)
+		{
+			if(heu)
+				heuristic_generate(bd, srh, srh->me, srh->opp);
+			pos = mvlist_first(hlist(bd));
+		}
+		else
+			pos = mvlist_first(mlist(bd));
+
+		while(pos != END)
+		{
+			if(dep > 1)
+				do_move(bd, pos, srh->me);
+			else
+				do_move_no_mvlist_pinc(bd, pos, srh->me);
+
+			val = alphabeta_time(bd, srh, dep - 1, srh->opp, alpha, beta, &tmp, 1);
+			if(!heu)
+				pair_insert(&Pair, pos, val);
+			undo(bd);
+
+			if(val > alpha)
+			{
+				alpha = val;
+				*best = pos;
+			}
+			if(alpha >= beta)
+				break;
+			
+			if(dep > 1)
+				pos = mvlist_next(hlist(bd), pos);
+			else
+				pos = mvlist_next(mlist(bd), pos);
+		}
+		return alpha;
+	}
+	return INVALID;
 }
 
 u8 heuristic(board_t* bd, const search_t* srh)
 {
-	u8 tmp = 0;
+	u8 res, tmp;
 	
 	// first move
 	if(bd->num == 0)
@@ -521,16 +622,50 @@ u8 heuristic(board_t* bd, const search_t* srh)
 		}
 	}
 
-	if(srh->dep >= 6 && srh->presrh)
+	OriginTime = clock();
+	if(srh->dep >= 8 && srh->presrh)
 	{
-		heuristic_generate_root(bd, srh, srh->dep - 4, srh->me, srh->opp);
-		alphabeta(bd, srh, srh->dep, srh->me, LOSE - 1, WIN + 1, &tmp, 0);
+		// pre-search to generate hlist
+		heuristic_generate_root(bd, srh, srh->dep - 6, srh->me, srh->opp);
+
+		// return if there is only one move
+		if(mvlist_size(hlist(bd)) <= 1)
+			return mvlist_first(hlist(bd));
+	
+		// basic search
+		pair_reset(&Pair);
+		pattern_reset(pinc(bd));
+		alphabeta(bd, srh, srh->dep, srh->me, LOSE - 1, WIN + 1, &res, 0);
+		pair_sort_inplace(&Pair);
+		pair_to_mvlist(&Pair, hlist(bd));
+		tmp = Pair.arr[0].pos;
+	
+		CurrentTime = clock();
+		// return if disc number is less than 5
+		if(bd->num <= 5)
+			return Pair.arr[0].pos;
+		// return if more than half of the time is used
+		if(CurrentTime - OriginTime >= srh->tlimit * CLOCKS_PER_SEC / 2)
+			return Pair.arr[0].pos;
+		
+		// deeper search
+		pair_reset(&Pair);
+		pattern_reset(pinc(bd));
+		alphabeta_time(bd, srh, srh->dep + 2, srh->me, LOSE - 1, WIN + 1, &res, 0);
+
+		if(Pair.cnt == 0)
+			return tmp;
+		else
+		{
+			pair_sort_inplace(&Pair);
+			return Pair.arr[0].pos;
+		}
 	}
 	else
 	{
-		alphabeta(bd, srh, srh->dep, srh->me, LOSE - 1, WIN + 1, &tmp, 1);
+		pattern_reset(pinc(bd));
+		alphabeta(bd, srh, srh->dep, srh->me, LOSE - 1, WIN + 1, &res, 1);
+		return res;
 	}
-
-	return tmp;
 }
 

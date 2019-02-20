@@ -3,9 +3,9 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
- * book.c - opening book functions
+ * book.c - book load and search functions
  */
 
 #include "book.h"
