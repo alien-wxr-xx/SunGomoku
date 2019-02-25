@@ -3,7 +3,7 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
  * uiinc.h - interface functions for ui
  *
@@ -80,7 +80,6 @@ void player_do_move(const int x, const int y, int* isover, const u8 color);
  *			else if(isover == WHITE) white_win();
  *			else if(isover == DRAW) draw();
  *			else resume();
- *
  */
 int ai_do_move(int* isover, const u8 color);
 

@@ -3,9 +3,9 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
- * pattern.h - implementation of pattern_t data structure
+ * pattern.h - pattern_t data structure implementation
  */
 
 #ifndef __PATTERN_H__
@@ -50,6 +50,9 @@ static int pattern_read(const pattern_t* pat, const u8 type, const u8 color);
 
 // Increase the value of type in the pattern.
 static void pattern_inc(pattern_t* pat, const u8 type, const u8 color);
+
+// Decrease the value of type in the pattern.
+static void pattern_dec(pattern_t* pat, const u8 type, const u8 color);
 
 // Add two patterns.
 static void pattern_add(pattern_t* out, const pattern_t* in1, const pattern_t* in2);
@@ -98,6 +101,17 @@ void pattern_inc(pattern_t* pat, const u8 type, const u8 color)
 		pat->black[type]++;
 	else if(color == WHITE)
 		pat->white[type]++;
+	else
+		return;
+}
+
+static inline
+void pattern_dec(pattern_t* pat, const u8 type, const u8 color)
+{
+	if(color == BLACK)
+		pat->black[type]--;
+	else if(color == WHITE)
+		pat->white[type]--;
 	else
 		return;
 }
