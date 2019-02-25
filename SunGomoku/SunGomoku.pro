@@ -32,27 +32,31 @@ SOURCES += \
     xrUI/chessboard.cpp \
     xrUI/xrhall.cpp \
     xrUI/xrroom.cpp \
+    xrUI/xrtemp.cpp \
     Kernel/board.c \
     Kernel/book.c \
+    Kernel/pair.c \
     Kernel/search.c \
     Kernel/tree.c \
     Kernel/uiinc.c \
-    xrUI/xrtemp.cpp
+    Kernel/table.c
 
 HEADERS += \
+    xrUI/chessboard.h \
+    xrUI/xrhall.h \
+    xrUI/xrroom.h \
+    xrUI/xrtemp.h \
     Kernel/board.h \
     Kernel/book.h \
     Kernel/key.h \
     Kernel/macro.h \
     Kernel/mvlist.h \
+    Kernel/pair.h \
     Kernel/pattern.h \
     Kernel/search.h \
+    Kernel/table.h \
     Kernel/tree.h \
-    Kernel/uiinc.h \
-    xrUI/chessboard.h \
-    xrUI/xrhall.h \
-    xrUI/xrroom.h \
-    xrUI/xrtemp.h
+    Kernel/uiinc.h
 
 FORMS += \
     xrUI/xrhall.ui \

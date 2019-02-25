@@ -3,7 +3,7 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.1        /______/_____/_/ /_/
+ *  2019.2        /______/_____/_/ /_/
  *
  * uiinc.c - interface functions for ui
  */
@@ -15,39 +15,36 @@
 #include "book.h"
 
 extern bool isForbidden;
-
 static board_t Board;
 
 search_t Srh = {
 	.sc = {
-		.win = WIN,
-		.lose = LOSE,
-		.free4 = 4320,
+		.free4 = 5000,
 		.dead4 = 882,
 		.free3 = 630,
-		.dead3 = 294,
+		.dead3 = 210,
 		.free2 = 210,
-		.dead2 = 42,
-		.free1 = 30,
+		.dead2 = 25,
+		.free1 = 25,
 		.dead1 = 1,
 		.free3a = 693,
 		.free2a = 231,
-		.free1a = 33
+		.free1a = 27
 	},
-	.me = BLACK,
-	.opp = WHITE,
-	.leaf = 10,
+	.hpleaf = 16,
+	.htleaf = 10,
 	.dep = 10,
+	.tlimit = 3,
 	.presrh = true,
-	.book = true
+	.book = false
 };
 
 void initialize()
 {
 	srand(time(0));
 	nei_table_init();
-	pattern_table_init1();
-	pattern_table_init2();
+//	pattern_table_init1();
+//	pattern_table_init2();
 }
 
 void restart()
@@ -65,53 +62,41 @@ void uninitialize()
 void set_forbidden(const int flag)
 {
 	if(flag)
+    {
 		isForbidden = true;
+        pattern_table_init1();
+        pattern_table_init2();
+    }
 	else
+    {
 		isForbidden = false;
+        pattern_table_init1();
+        pattern_table_init2();
+    }
 }
 
 void set_difficulty(const int dif)
 {
-	if(isForbidden)
-	{
-		switch(dif)
-		{
-			case 0:
-				Srh.dep = 4;
-				Srh.book = false;
-				break;
-			case 1:
-				Srh.dep = 8;
-				Srh.book = false;
-				break;
-			case 2:
-				Srh.dep = 10;
-				Srh.book = true;
-				break;
-			default:
-				break;
-		}
-	}
-	else
-	{
-		switch(dif)
-		{
-			case 0:
-				Srh.dep = 1;
-				Srh.book = false;
-				break;
-			case 1:
-				Srh.dep = 2;
-				Srh.book = false;
-				break;
-			case 2:
-				Srh.dep = 4;
-				Srh.book = false;
-				break;
-			default:
-				break;
-		}
-	}
+    switch(dif)
+    {
+        case 0:
+            set_forbidden(false);
+            Srh.dep = 10;
+            Srh.book = false;
+            break;
+        case 1:
+            set_forbidden(true);
+            Srh.dep = 10;
+            Srh.book = false;
+            break;
+        case 2:
+            set_forbidden(true);
+            Srh.dep = 10;
+            Srh.book = true;
+            break;
+        default:
+            break;
+    }
 }
 
 void player_do_move(const int x, const int y, int* isover, const u8 color)
