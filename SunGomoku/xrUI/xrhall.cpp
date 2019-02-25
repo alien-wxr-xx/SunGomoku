@@ -13,7 +13,7 @@ xrHall::xrHall(QWidget *parent) :
 
     this->setWindowTitle("Welcome to SunGomoku!");
 
-    vtext = "AI v1.1.4, UI v1.4-beta2";
+    vtext = "AI v1.1.3, UI v1.4-beta2";
     ui->versionLabel->setText(vtext);
     ui->versionLabel->setAlignment(Qt::AlignCenter);
 
@@ -22,11 +22,11 @@ xrHall::xrHall(QWidget *parent) :
     chesscolor->addButton(ui->white,2);
     ui->black->setChecked(true);
 
-//    edition = new QButtonGroup(this);
-//    edition->addButton(ui->proEdition,1);
-//    edition->addButton(ui->pubEdition,0);
-//    ui->proEdition->setChecked(true);
-    set_forbidden(true);
+    edition = new QButtonGroup(this);
+    edition->addButton(ui->proEdition,1);
+    edition->addButton(ui->pubEdition,0);
+    ui->proEdition->setChecked(true);
+    set_forbidden(edition->checkedId());
 }
 
 xrHall::~xrHall()

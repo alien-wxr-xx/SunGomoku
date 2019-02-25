@@ -3,9 +3,9 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.2        /______/_____/_/ /_/
+ *  2019.1        /______/_____/_/ /_/
  *
- * board.h - board_t data structure
+ * board.h - implementation of board_t data structure
  */
 
 #ifndef __BOARD_H__
@@ -17,8 +17,6 @@ extern "C" {
 
 #include "pattern.h"
 #include "mvlist.h"
-#include "pair.h"
-#include "table.h"
 
 #define mstk(bd)	&bd->mstk
 #define pinc(bd)	&bd->pinc
@@ -29,14 +27,14 @@ extern "C" {
 
 // board_t data structure
 typedef struct {
-	u8 num;							// # of discs
-	u8 arr[15 * 15];				// disc array
-	mvlist_t mstk;					// move stack
-	pattern_t pinc;					// pattern increment for do_move
-	pattern_t hpinc;				// pattern increment for do_move_no_mvlist
-	pattern_t pat[15 * 15];			// pattern stack
-	mvlist_t mlist[15 * 15];		// mvlist stack
-	mvlist_t hlist[15 * 15];		// heuristic mvlist stack
+	u8 num;						// # of discs
+	u8 arr[15 * 15];			// disc array
+	mvlist_t mstk;				// move stack
+	pattern_t pinc;				// pattern increment for do_move
+	pattern_t hpinc;			// pattern increment for do_move_no_mvlist
+	pattern_t pat[15 * 15];		// pattern stack
+	mvlist_t mlist[15 * 15];	// mvlist stack
+	mvlist_t hlist[15 * 15];	// heuristic mvlist stack
 } board_t;
 
 /*
@@ -66,19 +64,14 @@ void board_init(board_t* bd, const char (*arr)[15]);
 u8 board_gameover(const board_t* bd);
 
 /*
- * Make a move and update pat(bd), pinc(bd) and mlist(bd).
- */
-void do_move(board_t* bd, const u8 pos, const u8 color);
-
-/*
- * Make a move and update pat(bd) and hpinc(bd).
+ * Make a move without updating mlist.
  */
 void do_move_no_mvlist(board_t* bd, const u8 pos, const u8 color);
 
 /*
- * Make a move and update pat(bd) and pinc(bd).
+ * Make a move and update all.
  */
-void do_move_no_mvlist_pinc(board_t* bd, const u8 pos, const u8 color);
+void do_move(board_t* bd, const u8 pos, const u8 color);
 
 /*
  * Undo the most recent move.

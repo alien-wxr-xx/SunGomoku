@@ -3,19 +3,1022 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.2        /______/_____/_/ /_/
+ *  2019.1        /______/_____/_/ /_/
  *
- * board.c - board_t data structure
+ * board.c - implementation of board_t data structure
  */
 
 #include "board.h"
 #include "macro.h"
 #include "pattern.h"
 #include "mvlist.h"
-#include "table.h"
+
+// powers of three
+#define P0		1
+#define P1		3
+#define P2		9
+#define P3		27
+#define P4		81
+#define P5		243
+#define P6		729
+#define P7		2187
+#define P8		6561
+#define P9		19683
+#define P10		59049
+#define P11		177147
+#define P12		531441
+#define P13		1594323
+#define P14		4782969
+#define P15		14348907
 
 // global variable controlling if consider forbidden points
 bool isForbidden = true;
+
+/*******************************************************************************
+							Neighbor table generation
+*******************************************************************************/
+#define NEI_SIZE	16
+#define NEI_DEBUG	0
+
+static u8 nei[15 * 15][NEI_SIZE];
+static u8 nei_helper[19][19];
+
+#if NEI_DEBUG
+static void print_nei_helper()
+{
+	int r, c;
+	for(r = 0; r < 19; r++)
+	{
+		for(c = 0; c < 19; c++)
+			printf("%d\t", nei_helper[r][c]);
+		putchar('\n');
+		putchar('\n');
+	}
+}
+
+static void print_nei()
+{
+	int r, c, i;
+	for(r = 0; r < 15; r++)
+	{
+		for(c = 0; c < 15; c++)
+		{
+			printf("(%d,%d):  \t", r, c);
+			for(i = 0; i < NEI_SIZE; i++)
+				if(nei[r * 15 + c][i] != INVALID)
+					printf("%d  ", nei[r * 15 + c][i]);
+			putchar('\n');
+		}
+	}
+	putchar('\n');
+}
+#endif
+
+static void nei_helper_init()
+{
+	int r, c;
+	for(r = 0; r < 19; r++)
+	{
+		for(c = 0; c < 19; c++)
+		{
+			if(r == 0 || r == 1 || r == 17 || r == 18
+				|| c == 0 || c == 1 || c == 17 || c == 18)
+				nei_helper[r][c] = INVALID;
+			else
+				nei_helper[r][c] = (r - 2) * 15 + c - 2;
+		}
+	}
+#if NEI_DEBUG
+	print_nei_helper();
+#endif
+}
+
+void nei_table_init()
+{
+	int nr, nc, ar, ac;
+	int index, i, j;
+
+	nei_helper_init();
+
+	for(nr = 0; nr < 15; nr++)
+	{
+		for(nc = 0; nc < 15; nc++)
+		{
+			index = 0;
+		
+			// 2 discs away
+			for(i = 2; i >= -2; i -= 2)	
+			{
+				for(j = 2; j >= -2; j -= 2)
+				{
+					ar = nr + 2 + i;
+					ac = nc + 2 + j;
+					if(nei_helper[ar][ac] != INVALID && !(i == 0 && j == 0))
+						nei[nr * 15 + nc][index++] = nei_helper[ar][ac];
+				}
+			}
+	
+			// 1 disc away
+			for(i = 1; i >= -1; i -= 1)	
+			{
+				for(j = 1; j >= -1; j -= 1)
+				{
+					ar = nr + 2 + i;
+					ac = nc + 2 + j;
+					if(nei_helper[ar][ac] != INVALID && !(i == 0 && j == 0))
+						nei[nr * 15 + nc][index++] = nei_helper[ar][ac];
+				}
+			}
+	
+			// mark the rest as invalid
+			if(index != NEI_SIZE)
+				for(i = index; i < NEI_SIZE; i++)
+					nei[nr * 15 + nc][i] = INVALID;
+		}
+	}
+#if NEI_DEBUG
+	print_nei();
+#endif
+}
+
+/*******************************************************************************
+							Line count implementation
+*******************************************************************************/
+#define PAT_ROW		122
+
+// helper structure
+typedef struct {
+	bool is;
+	u8 color;
+	u8 mask;
+} pat_t;
+
+// pat_t tables
+static pat_t lon[P6];
+static pat_t five[P5];
+static pat_t free4[P6];
+static pat_t dead4[P5];
+static pat_t free3[P6];
+static pat_t dead3[P5];
+static pat_t free2[P6];
+static pat_t dead2[P5];
+static pat_t free1[P6];
+static pat_t dead1[P5];
+static pat_t free3a[P7];
+static pat_t free2a[P7];
+static pat_t free1a[P7];
+static pat_t d4d47[P7];
+static pat_t d4d48[P8];
+static pat_t d4d49[P9];
+static pat_t d4b7[P7];
+static pat_t d3b8[P8];
+static pat_t d3b7[P7];
+static pat_t b6[P6];
+
+// array for generating lookup tables
+// one row represents pattern length, index, type, color and mask
+// overlapping patterns are not considered
+static u16 pat_tab[PAT_ROW][5] = 
+{
+	// 1-2
+	{ 6, 364, LONG,  BLACK, 0x3f },		// 111111
+	{ 6, 728, LONG,  WHITE, 0x3f },
+
+	// 3-4
+	{ 5, 121, FIVE,  BLACK, 0x1f },		// 11111
+	{ 5, 242, FIVE,  WHITE, 0x1f },
+
+	// 5-6
+	{ 6, 120, FREE4, BLACK, 0x1e },		// 011110
+	{ 6, 240, FREE4, WHITE, 0x1e },
+	
+	// 7-16
+	{ 5, 120, DEAD4, BLACK, 0x1e },		// 11110
+	{ 5, 240, DEAD4, WHITE, 0x1e },
+	{ 5, 118, DEAD4, BLACK, 0x1d },		// 11101
+	{ 5, 236, DEAD4, WHITE, 0x1d },
+	{ 5, 112, DEAD4, BLACK, 0x1b },		// 11011
+	{ 5, 224, DEAD4, WHITE, 0x1b },
+	{ 5, 94,  DEAD4, BLACK, 0x17 },		// 10111
+	{ 5, 188, DEAD4, WHITE, 0x17 },
+	{ 5, 40,  DEAD4, BLACK, 0x0f },		// 01111
+	{ 5, 80,  DEAD4, WHITE, 0x0f },
+
+	// 17-24
+	{ 6, 117, FREE3, BLACK, 0x1c },		// 011100
+	{ 6, 234, FREE3, WHITE, 0x1c },
+	{ 6, 111, FREE3, BLACK, 0x1a },		// 011010
+	{ 6, 222, FREE3, WHITE, 0x1a },
+	{ 6, 93,  FREE3, BLACK, 0x16 },		// 010110
+	{ 6, 186, FREE3, WHITE, 0x16 },
+	{ 6, 39,  FREE3, BLACK, 0x0e },		// 001110
+	{ 6, 78,  FREE3, WHITE, 0x0e },
+
+	// 25-44
+	{ 5, 117, DEAD3, BLACK, 0x1c},		// 11100
+	{ 5, 234, DEAD3, WHITE, 0x1c},
+	{ 5, 111, DEAD3, BLACK, 0x1a},		// 11010
+	{ 5, 222, DEAD3, WHITE, 0x1a},
+	{ 5, 93,  DEAD3, BLACK, 0x16},		// 10110
+	{ 5, 186, DEAD3, WHITE, 0x16},
+	{ 5, 39,  DEAD3, BLACK, 0x0e},		// 01110
+	{ 5, 78,  DEAD3, WHITE, 0x0e},
+	{ 5, 109, DEAD3, BLACK, 0x19},		// 11001
+	{ 5, 218, DEAD3, WHITE, 0x19},
+	{ 5, 91,  DEAD3, BLACK, 0x15},		// 10101
+	{ 5, 182, DEAD3, WHITE, 0x15},
+	{ 5, 37,  DEAD3, BLACK, 0x0d},		// 01101
+	{ 5, 74,  DEAD3, WHITE, 0x0d},
+	{ 5, 85,  DEAD3, BLACK, 0x13},		// 10011
+	{ 5, 170, DEAD3, WHITE, 0x13},
+	{ 5, 31,  DEAD3, BLACK, 0x0b},		// 01011
+	{ 5, 62,  DEAD3, WHITE, 0x0b},
+	{ 5, 13,  DEAD3, BLACK, 0x07},		// 00111
+	{ 5, 26,  DEAD3, WHITE, 0x07},
+
+	// 45-56
+	{ 6, 108, FREE2, BLACK, 0x18 },		// 011000
+	{ 6, 216, FREE2, WHITE, 0x18 },
+	{ 6, 90,  FREE2, BLACK, 0x14 },		// 010100
+	{ 6, 180, FREE2, WHITE, 0x14 },
+	{ 6, 36,  FREE2, BLACK, 0x0c },		// 001100
+	{ 6, 72,  FREE2, WHITE, 0x0c },
+	{ 6, 84,  FREE2, BLACK, 0x12 },		// 010010
+	{ 6, 168, FREE2, WHITE, 0x12 },
+	{ 6, 30,  FREE2, BLACK, 0x0a },		// 001010
+	{ 6, 60,  FREE2, WHITE, 0x0a },
+	{ 6, 12,  FREE2, BLACK, 0x06 },		// 000110
+	{ 6, 24,  FREE2, WHITE, 0x06 },
+
+	// 57-76
+	{ 5, 4,   DEAD2, BLACK, 0x03 },		// 00011
+	{ 5, 8,   DEAD2, WHITE, 0x03 },
+	{ 5, 10,  DEAD2, BLACK, 0x05 },		// 00101
+	{ 5, 20,  DEAD2, WHITE, 0x05 },
+	{ 5, 28,  DEAD2, BLACK, 0x09 },		// 01001
+	{ 5, 56,  DEAD2, WHITE, 0x09 },
+	{ 5, 82,  DEAD2, BLACK, 0x11 },		// 10001
+	{ 5, 164, DEAD2, WHITE, 0x11 },
+	{ 5, 12,  DEAD2, BLACK, 0x06 },		// 00110
+	{ 5, 24,  DEAD2, WHITE, 0x06 },
+	{ 5, 30,  DEAD2, BLACK, 0x0a },		// 01010
+	{ 5, 60,  DEAD2, WHITE, 0x0a },
+	{ 5, 84,  DEAD2, BLACK, 0x12 },		// 10010
+	{ 5, 168, DEAD2, WHITE, 0x12 },
+	{ 5, 36,  DEAD2, BLACK, 0x0c },		// 01100
+	{ 5, 72,  DEAD2, WHITE, 0x0c },
+	{ 5, 90,  DEAD2, BLACK, 0x14 },		// 10100
+	{ 5, 180, DEAD2, WHITE, 0x14 },
+	{ 5, 108, DEAD2, BLACK, 0x18 },		// 11000
+	{ 5, 216, DEAD2, WHITE, 0x18 },
+
+	// 77-84
+	{ 6, 3,   FREE1, BLACK, 0x02 },		// 000010
+	{ 6, 6,   FREE1, WHITE, 0x02 },
+	{ 6, 9,   FREE1, BLACK, 0x04 },		// 000100
+	{ 6, 18,  FREE1, WHITE, 0x04 },
+	{ 6, 27,  FREE1, BLACK, 0x08 },		// 001000
+	{ 6, 54,  FREE1, WHITE, 0x08 },
+	{ 6, 81,  FREE1, BLACK, 0x10 },		// 010000
+	{ 6, 162, FREE1, WHITE, 0x10 },
+
+	// 85-94
+	{ 5, 1,   DEAD1, BLACK, 0x01 },		// 00001
+	{ 5, 2,   DEAD1, WHITE, 0x01 },
+	{ 5, 3,   DEAD1, BLACK, 0x02 },		// 00010
+	{ 5, 6,   DEAD1, WHITE, 0x02 },
+	{ 5, 9,   DEAD1, BLACK, 0x04 },		// 00100
+	{ 5, 18,  DEAD1, WHITE, 0x04 },
+	{ 5, 27,  DEAD1, BLACK, 0x08 },		// 01000
+	{ 5, 54,  DEAD1, WHITE, 0x08 },
+	{ 5, 81,  DEAD1, BLACK, 0x10 },		// 10000
+	{ 5, 162, DEAD1, WHITE, 0x10 },
+
+	// 95-96
+	{ 7, 117, FREE3a, BLACK, 0x1c },	// 0011100
+	{ 7, 234, FREE3a, WHITE, 0x1c },
+
+	// 97-100
+	{ 7, 108, FREE2a, BLACK, 0x18 },	// 0011000
+	{ 7, 216, FREE2a, WHITE, 0x18 },
+	{ 7, 36,  FREE2a, BLACK, 0x0c },	// 0001100
+	{ 7, 72,  FREE2a, WHITE, 0x0c },
+
+	// 101-102
+	{ 7, 27,  FREE1a, BLACK, 0x08 },	// 0001000
+	{ 7, 54,  FREE1a, WHITE, 0x08 },
+
+	// 103-104
+	{ 7, 847, DEAD4, BLACK, 0x5d },		// 1011101
+	{ 7, 1694,DEAD4, WHITE, 0x5d },
+
+	// 105-106
+	{ 8, 3028,DEAD4, BLACK, 0xdb },		// 11011011
+	{ 8, 6056,DEAD4, WHITE, 0xdb },
+
+	// 107-108
+	{ 9, 9571,DEAD4, BLACK, 0x1d7},		// 111010111
+	{ 9,19142,DEAD4, WHITE, 0x1d7},
+
+	// 109-110
+	{ 7, 361, DEAD4, BLACK, 0x3c },		// 0111101
+	{ 7, 849, DEAD4, BLACK, 0x1e },		// 1011110
+
+	// 111-114
+	{ 8, 355, DEAD3, BLACK, 0x3b },		// 00111011
+	{ 8, 3033,DEAD3, BLACK, 0xdc },		// 11011100
+	{ 8, 4726,DEAD3, BLACK, 0x38 },		// 20111001
+	{ 8, 2306,DEAD3, BLACK, 0x1c },		// 10011102
+
+	// 115-118
+	{ 7, 822, DEAD3, BLACK, 0x16 },		// 1010110
+	{ 7, 840, DEAD3, BLACK, 0x1a },		// 1011010
+	{ 7, 280, DEAD3, BLACK, 0x2c },		// 0101101
+	{ 7, 334, DEAD3, BLACK, 0x34 },		// 0110101
+
+	// 119-122
+	{ 6, 361,    99, BLACK, 0x3c },		// 111101
+	{ 6, 355,    99, BLACK, 0x3b },		// 111011
+	{ 6, 337,    99, BLACK, 0x27 },		// 110111
+	{ 6, 283,    99, BLACK, 0x1e }		// 101111
+};
+
+// initialize pat_t arrays
+static void pat_t_init()
+{
+	int i;
+
+	// reset all
+	for(i = 0; i < P5; i++)
+	{
+		five[i].is = false;
+		dead4[i].is = false;
+		dead3[i].is = false;
+		dead2[i].is = false;
+		dead1[i].is = false;
+	}
+	for(i = 0; i < P6; i++)
+	{
+		lon[i].is = false;
+		free4[i].is = false;
+		free3[i].is = false;
+		free2[i].is = false;
+		free1[i].is = false;
+		b6[i].is = false;
+	}
+	for(i = 0; i < P7; i++)
+	{
+		free3a[i].is = false;
+		free2a[i].is = false;
+		free1a[i].is = false;
+		d4d47[i].is = false;
+		d3b7[i].is = false;
+		d4b7[i].is = false;
+	}
+	for(i = 0; i < P8; i++)
+	{
+		d4d48[i].is = false;
+		d3b8[i].is = false;
+	}
+	for(i = 0; i < P9; i++)
+	{
+		d4d49[i].is = false;
+	}
+	
+	// lon
+	for(i = 0; i < 2; i++)
+	{
+		lon[pat_tab[i][1]].is = true;
+		lon[pat_tab[i][1]].color = pat_tab[i][3];
+		lon[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// five
+	for(i = 2; i < 4; i++)
+	{
+		five[pat_tab[i][1]].is = true;
+		five[pat_tab[i][1]].color = pat_tab[i][3];
+		five[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free4
+	for(i = 4; i < 6; i++)
+	{
+		free4[pat_tab[i][1]].is = true;
+		free4[pat_tab[i][1]].color = pat_tab[i][3];
+		free4[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// dead4
+	for(i = 6; i < 16; i++)
+	{
+		dead4[pat_tab[i][1]].is = true;
+		dead4[pat_tab[i][1]].color = pat_tab[i][3];
+		dead4[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free3
+	for(i = 16; i < 24; i++)
+	{
+		free3[pat_tab[i][1]].is = true;
+		free3[pat_tab[i][1]].color = pat_tab[i][3];
+		free3[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// dead3
+	for(i = 24; i < 44; i++)
+	{
+		dead3[pat_tab[i][1]].is = true;
+		dead3[pat_tab[i][1]].color = pat_tab[i][3];
+		dead3[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free2
+	for(i = 44; i < 56; i++)
+	{
+		free2[pat_tab[i][1]].is = true;
+		free2[pat_tab[i][1]].color = pat_tab[i][3];
+		free2[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// dead2
+	for(i = 56; i < 76; i++)
+	{
+		dead2[pat_tab[i][1]].is = true;
+		dead2[pat_tab[i][1]].color = pat_tab[i][3];
+		dead2[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free1
+	for(i = 76; i < 84; i++)
+	{
+		free1[pat_tab[i][1]].is = true;
+		free1[pat_tab[i][1]].color = pat_tab[i][3];
+		free1[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// dead1
+	for(i = 84; i < 94; i++)
+	{
+		dead1[pat_tab[i][1]].is = true;
+		dead1[pat_tab[i][1]].color = pat_tab[i][3];
+		dead1[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free3a
+	for(i = 94; i < 96; i++)
+	{
+		free3a[pat_tab[i][1]].is = true;
+		free3a[pat_tab[i][1]].color = pat_tab[i][3];
+		free3a[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free2a
+	for(i = 96; i < 100; i++)
+	{
+		free2a[pat_tab[i][1]].is = true;
+		free2a[pat_tab[i][1]].color = pat_tab[i][3];
+		free2a[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// free1a
+	for(i = 100; i < 102; i++)
+	{
+		free1a[pat_tab[i][1]].is = true;
+		free1a[pat_tab[i][1]].color = pat_tab[i][3];
+		free1a[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	//d4d47
+	for(i = 102; i < 104; i++)
+	{
+		d4d47[pat_tab[i][1]].is = true;
+		d4d47[pat_tab[i][1]].color = pat_tab[i][3];
+		d4d47[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	//d4d48
+	for(i = 104; i < 106; i++)
+	{
+		d4d48[pat_tab[i][1]].is = true;
+		d4d48[pat_tab[i][1]].color = pat_tab[i][3];
+		d4d48[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	//d4d49
+	for(i = 106; i < 108; i++)
+	{
+		d4d49[pat_tab[i][1]].is = true;
+		d4d49[pat_tab[i][1]].color = pat_tab[i][3];
+		d4d49[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// d4b7
+	for(i = 108; i < 110; i++)
+	{
+		d4b7[pat_tab[i][1]].is = true;
+		d4b7[pat_tab[i][1]].color = pat_tab[i][3];
+		d4b7[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// d3b8
+	for(i = 110; i < 114; i++)
+	{
+		d3b8[pat_tab[i][1]].is = true;
+		d3b8[pat_tab[i][1]].color = pat_tab[i][3];
+		d3b8[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// d3b7
+	for(i = 114; i < 118; i++)
+	{
+		d3b7[pat_tab[i][1]].is = true;
+		d3b7[pat_tab[i][1]].color = pat_tab[i][3];
+		d3b7[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+	// b6
+	for(i = 118; i < 122; i++)
+	{
+		b6[pat_tab[i][1]].is = true;
+		b6[pat_tab[i][1]].color = pat_tab[i][3];
+		b6[pat_tab[i][1]].mask = pat_tab[i][4];
+	}
+}
+
+// count patterns of a given line array
+// len is array length
+static inline void line_cnt(pattern_t* pat, const u8* arr, const int len)
+{
+	u16 mask = 0;
+	int fiv[11], six[10], sev[9], eig[8], nin[7];
+	int bound5 = len - 4;
+	int bound6 = len - 5;
+	int bound7 = len - 6;
+	int bound8 = len - 7;
+	int bound9 = len - 8;
+	int i;
+
+	pattern_reset(pat);
+
+	for(i = 0; i < bound5; i++)
+	{
+		fiv[i] = arr[i] * P0 + arr[i + 1] * P1 + arr[i + 2] * P2
+				+ arr[i + 3] * P3 + arr[i + 4] * P4;
+	}
+	for(i = 0; i < bound6; i++)
+	{
+		six[i] = arr[i] * P0 + arr[i + 1] * P1 + arr[i + 2] * P2
+			+ arr[i + 3] * P3 + arr[i + 4] * P4 + arr[i + 5] * P5;
+	}
+	for(i = 0; i < bound7; i++)
+	{
+		sev[i] = arr[i] * P0 + arr[i + 1] * P1 + arr[i + 2] * P2
+			+ arr[i + 3] * P3 + arr[i + 4] * P4 + arr[i + 5] * P5 
+			+ arr[i + 6] * P6;
+	}
+	for(i = 0; i < bound8; i++)
+	{
+		eig[i] = arr[i] * P0 + arr[i + 1] * P1 + arr[i + 2] * P2
+			+ arr[i + 3] * P3 + arr[i + 4] * P4 + arr[i + 5] * P5
+			+ arr[i + 6] * P6 + arr[i + 7] * P7;
+	}
+	for(i = 0; i < bound9; i++)
+	{
+		nin[i] = arr[i] * P0 + arr[i + 1] * P1 + arr[i + 2] * P2
+			+ arr[i + 3] * P3 + arr[i + 4] * P4 + arr[i + 5] * P5
+			+ arr[i + 6] * P6 + arr[i + 7] * P7 + arr[i + 8] * P8;
+	}
+
+	// long
+	if(isForbidden)
+	{
+		for(i = 0; i < bound6; i++)
+		{
+			if(lon[six[i]].is && !((mask >> i) & 0x3f))
+			{
+				pattern_inc(pat, LONG, lon[six[i]].color);
+				mask |= lon[six[i]].mask << i;
+			}
+		}
+	}
+	// five
+	for(i = 0; i < bound5; i++)
+	{
+		if(five[fiv[i]].is && !((mask >> i) & 0x1f))
+		{
+			pattern_inc(pat, FIVE, five[fiv[i]].color);
+			mask |= five[fiv[i]].mask << i;
+		}
+	}
+	// d3b8
+	if(isForbidden)
+	{
+		for(i = 0; i < bound8; i++)
+		{
+			if(d3b8[eig[i]].is && !((mask >> i) & 0xff))
+			{
+				pattern_inc(pat, DEAD3, d3b8[eig[i]].color);
+				mask |= d3b8[eig[i]].mask << i;
+			}
+		}
+		// d4b7
+		for(i = 0; i < bound7; i++)
+		{
+			if(d4b7[sev[i]].is && !((mask >> i) & 0x7f))
+			{
+				pattern_inc(pat, DEAD4, d4b7[sev[i]].color);
+				mask |= d4b7[sev[i]].mask << i;
+			}
+		}
+		// b6
+		for(i = 0; i < bound6; i++)
+		{
+			if(b6[six[i]].is && !((mask >> i) & 0x3f))
+				mask |= b6[six[i]].mask << i;
+		}
+	}
+	// free4
+	for(i = 0; i < bound6; i++)
+	{
+		if(free4[six[i]].is && !((mask >> i) & 0x3f))
+		{
+			pattern_inc(pat, FREE4, free4[six[i]].color);
+			mask |= free4[six[i]].mask << i;
+		}
+	}
+	// d4d49
+	for(i = 0; i < bound9; i++)
+	{
+		if(d4d49[nin[i]].is && !((mask >> i) & 0x1ff))
+		{
+			pattern_inc(pat, DEAD4, d4d49[nin[i]].color);
+			pattern_inc(pat, DEAD4, d4d49[nin[i]].color);
+			mask |= d4d49[nin[i]].mask << i;
+		}
+	}
+	// d4d48
+	for(i = 0; i < bound8; i++)
+	{
+		if(d4d48[eig[i]].is && !((mask >> i) & 0xff))
+		{
+			pattern_inc(pat, DEAD4, d4d48[eig[i]].color);
+			pattern_inc(pat, DEAD4, d4d48[eig[i]].color);
+			mask |= d4d48[eig[i]].mask << i;
+		}
+	}
+	// d4d47
+	for(i = 0; i < bound7; i++)
+	{
+		if(d4d47[sev[i]].is && !((mask >> i) & 0x7f))
+		{
+			pattern_inc(pat, DEAD4, d4d47[sev[i]].color);
+			pattern_inc(pat, DEAD4, d4d47[sev[i]].color);
+			mask |= d4d47[sev[i]].mask << i;
+		}
+	}
+	// dead4
+	for(i = 0; i < bound5; i++)
+	{
+		if(dead4[fiv[i]].is && !((mask >> i) & 0x1f))
+		{
+			pattern_inc(pat, DEAD4, dead4[fiv[i]].color);
+			mask |= dead4[fiv[i]].mask << i;
+		}
+	}
+	// d3b7
+	if(isForbidden)
+	{
+		for(i = 0; i < bound7; i++)
+		{
+			if(d3b7[sev[i]].is && !((mask >> i) & 0x7f))
+			{
+				pattern_inc(pat, DEAD3, d3b7[sev[i]].color);
+				mask |= d3b7[sev[i]].mask << i;
+			}
+		}
+	}
+	// free3a
+	for(i = 0; i < bound7; i++)
+	{
+		if(free3a[sev[i]].is && !((mask >> i) & 0x7f))
+		{
+			pattern_inc(pat, FREE3a, free3a[sev[i]].color);
+			mask |= free3a[sev[i]].mask << i;
+		}
+	}
+	// free3
+	for(i = 0; i < bound6; i++)
+	{
+		if(free3[six[i]].is && !((mask >> i) & 0x3f))
+		{
+			pattern_inc(pat, FREE3, free3[six[i]].color);
+			mask |= free3[six[i]].mask << i;
+		}
+	}
+	// dead3
+	for(i = 0; i < bound5; i++)
+	{
+		if(dead3[fiv[i]].is && !((mask >> i) & 0x1f))
+		{
+			pattern_inc(pat, DEAD3, dead3[fiv[i]].color);
+			mask |= dead3[fiv[i]].mask << i;
+		}
+	}
+	// free2a
+	for(i = 0; i < bound7; i++)
+	{
+		if(free2a[sev[i]].is && !((mask >> i) & 0x7f))
+		{
+			pattern_inc(pat, FREE2a, free2a[sev[i]].color);
+			mask |= free2a[sev[i]].mask << i;
+		}
+	}
+	// free2
+	for(i = 0; i < bound6; i++)
+	{
+		if(free2[six[i]].is && !((mask >> i) & 0x3f))
+		{
+			pattern_inc(pat, FREE2, free2[six[i]].color);
+			mask |= free2[six[i]].mask << i;
+		}
+	}
+	// dead2
+	for(i = 0; i < bound5; i++)
+	{
+		if(dead2[fiv[i]].is && !((mask >> i) & 0x1f))
+		{
+			pattern_inc(pat, DEAD2, dead2[fiv[i]].color);
+			mask |= dead2[fiv[i]].mask << i;
+		}
+	}
+	// free1a
+	for(i = 0; i < bound7; i++)
+	{
+		if(free1a[sev[i]].is && !((mask >> i) & 0x7f))
+		{
+			pattern_inc(pat, FREE1a, free1a[sev[i]].color);
+			mask |= free1a[sev[i]].mask << i;
+		}
+	}
+	// free1
+	for(i = 0; i < bound6; i++)
+	{
+		if(free1[six[i]].is && !((mask >> i) & 0x3f))
+		{
+			pattern_inc(pat, FREE1, free1[six[i]].color);
+			mask |= free1[six[i]].mask << i;
+		}
+	}
+	// dead1
+	for(i = 0; i < bound5; i++)
+	{
+		if(dead1[fiv[i]].is && !((mask >> i) & 0x1f))
+		{
+			pattern_inc(pat, DEAD1, dead1[fiv[i]].color);
+			mask |= dead1[fiv[i]].mask << i;
+		}
+	}
+}
+
+/*******************************************************************************
+						Pattern lookup table generation
+*******************************************************************************/
+// pattern lookup tables
+static pattern_t table15[P15];
+static pattern_t table14[P14];
+static pattern_t table13[P13];
+static pattern_t table12[P12];
+static pattern_t table11[P11];
+static pattern_t table10[P10];
+static pattern_t table9[P9];
+static pattern_t table8[P8];
+static pattern_t table7[P7];
+static pattern_t table6[P6];
+static pattern_t table5[P5];
+
+// generate pattern lookup tables
+static void table15_init()
+{
+	u32 index;
+	u8 a[15];
+	for(a[14] = EMPTY; a[14] <= WHITE; a[14]++) {
+	for(a[13] = EMPTY; a[13] <= WHITE; a[13]++) {
+	for(a[12] = EMPTY; a[12] <= WHITE; a[12]++) {
+	for(a[11] = EMPTY; a[11] <= WHITE; a[11]++) {
+	for(a[10] = EMPTY; a[10] <= WHITE; a[10]++) {
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[14]*P14 + a[13]*P13 + a[12]*P12 + a[11]*P11 + a[10]*P10
+			+ a[9]*P9 + a[8]*P8 + a[7]*P7 + a[6]*P6 + a[5]*P5 + a[4]*P4
+			+ a[3]*P3 + a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table15[index], a, 15);
+	} } } } } } } } } } } } } } }
+}
+
+static void table14_init()
+{
+	u32 index;
+	u8 a[14];
+	for(a[13] = EMPTY; a[13] <= WHITE; a[13]++) {
+	for(a[12] = EMPTY; a[12] <= WHITE; a[12]++) {
+	for(a[11] = EMPTY; a[11] <= WHITE; a[11]++) {
+	for(a[10] = EMPTY; a[10] <= WHITE; a[10]++) {
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[13]*P13 + a[12]*P12 + a[11]*P11 + a[10]*P10 + a[9]*P9 + a[8]*P8
+			+ a[7]*P7 + a[6]*P6 + a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2
+			+ a[1]*P1 + a[0]*P0;
+	line_cnt(&table14[index], a, 14);
+	} } } } } } } } } } } } } }
+}
+
+static void table13_init()
+{
+	u32 index;
+	u8 a[13];
+	for(a[12] = EMPTY; a[12] <= WHITE; a[12]++) {
+	for(a[11] = EMPTY; a[11] <= WHITE; a[11]++) {
+	for(a[10] = EMPTY; a[10] <= WHITE; a[10]++) {
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[12]*P12 + a[11]*P11 + a[10]*P10 + a[9]*P9 + a[8]*P8 + a[7]*P7
+			+ a[6]*P6 + a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2 + a[1]*P1
+			+ a[0]*P0;
+	line_cnt(&table13[index], a, 13);
+	} } } } } } } } } } } } }
+}
+
+static void table12_init()
+{
+	u32 index;
+	u8 a[12];
+	for(a[11] = EMPTY; a[11] <= WHITE; a[11]++) {
+	for(a[10] = EMPTY; a[10] <= WHITE; a[10]++) {
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[11]*P11 + a[10]*P10 + a[9]*P9 + a[8]*P8 + a[7]*P7 + a[6]*P6
+			+ a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table12[index], a, 12);
+	} } } } } } } } } } } }
+}
+
+static void table11_init()
+{
+	u32 index;
+	u8 a[11];
+	for(a[10] = EMPTY; a[10] <= WHITE; a[10]++) {
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {
+	index = a[10]*P10 + a[9]*P9 + a[8]*P8 + a[7]*P7 + a[6]*P6 + a[5]*P5
+			+ a[4]*P4 + a[3]*P3 + a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table11[index], a, 11);
+	} } } } } } } } } } }
+}
+
+static void table10_init()
+{
+	u32 index;
+	u8 a[10];
+	for(a[9] = EMPTY; a[9] <= WHITE; a[9]++) {
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[9]*P9 + a[8]*P8 + a[7]*P7	+ a[6]*P6 + a[5]*P5 + a[4]*P4
+			+ a[3]*P3 + a[2]*P2	+ a[1]*P1 + a[0]*P0;
+	line_cnt(&table10[index], a, 10);
+	} } } } } } } } } }
+}
+
+static void table9_init()
+{
+	u32 index;
+	u8 a[9];
+	for(a[8] = EMPTY; a[8] <= WHITE; a[8]++) {
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[8]*P8 + a[7]*P7 + a[6]*P6 + a[5]*P5 + a[4]*P4 + a[3]*P3
+			+ a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table9[index], a, 9);
+	} } } } } } } } }
+}
+
+static void table8_init()
+{
+	u32 index;
+	u8 a[8];
+	for(a[7] = EMPTY; a[7] <= WHITE; a[7]++) {
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[7]*P7 + a[6]*P6 + a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2
+			+ a[1]*P1 + a[0]*P0;
+	line_cnt(&table8[index], a, 8);
+	} } } } } } } }
+}
+
+static void table7_init()
+{
+	u32 index;
+	u8 a[7];
+	for(a[6] = EMPTY; a[6] <= WHITE; a[6]++) {
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[6]*P6 + a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2	+ a[1]*P1
+			+ a[0]*P0;
+	line_cnt(&table7[index], a, 7);
+	} } } } } } }
+}
+
+static void table6_init()
+{
+	u32 index;
+	u8 a[6];
+	for(a[5] = EMPTY; a[5] <= WHITE; a[5]++) {
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[5]*P5 + a[4]*P4 + a[3]*P3 + a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table6[index], a, 6);
+	} } } } } }
+}
+
+static void table5_init()
+{
+	u32 index;
+	u8 a[5];
+	for(a[4] = EMPTY; a[4] <= WHITE; a[4]++) {
+	for(a[3] = EMPTY; a[3] <= WHITE; a[3]++) {
+	for(a[2] = EMPTY; a[2] <= WHITE; a[2]++) {
+	for(a[1] = EMPTY; a[1] <= WHITE; a[1]++) {
+	for(a[0] = EMPTY; a[0] <= WHITE; a[0]++) {	
+	index = a[4]*P4 + a[3]*P3 + a[2]*P2 + a[1]*P1 + a[0]*P0;
+	line_cnt(&table5[index], a, 5);
+	} } } } }
+}
+
+void pattern_table_init1()
+{
+	pat_t_init();
+	table15_init();
+}
+
+void pattern_table_init2()
+{
+	table14_init();
+	table13_init();
+	table12_init();
+	table11_init();
+	table10_init();
+	table9_init();
+	table8_init();
+	table7_init();
+	table6_init();
+	table5_init();
+}
 
 /*******************************************************************************
 							Functions calculating index
@@ -642,6 +1645,184 @@ static u8 ad_len[15 * 15] = {
 /*******************************************************************************
 						board_t operation implementation
 *******************************************************************************/
+#define MAINDIAG	0
+#define ANTIDIAG	1
+#define SUBTRACT	0
+#define ADD			1
+
+// helper function
+static inline void diag_helper( board_t* bd, const u8 which,
+								const u8 op, const u8 pos)
+{
+	if(which == MAINDIAG && op == SUBTRACT)
+	{
+		switch(md_len[pos])
+		{
+		case 15:
+			pattern_sub(pat(bd), pat(bd), &table15[(*md[pos])(bd)]);
+			break;
+		case 14:
+			pattern_sub(pat(bd), pat(bd), &table14[(*md[pos])(bd)]);
+			break;
+		case 13:
+			pattern_sub(pat(bd), pat(bd), &table13[(*md[pos])(bd)]);
+			break;
+		case 12:
+			pattern_sub(pat(bd), pat(bd), &table12[(*md[pos])(bd)]);
+			break;
+		case 11:
+			pattern_sub(pat(bd), pat(bd), &table11[(*md[pos])(bd)]);
+			break;
+		case 10:
+			pattern_sub(pat(bd), pat(bd), &table10[(*md[pos])(bd)]);
+			break;
+		case 9:
+			pattern_sub(pat(bd), pat(bd), &table9[(*md[pos])(bd)]);
+			break;
+		case 8:
+			pattern_sub(pat(bd), pat(bd), &table8[(*md[pos])(bd)]);
+			break;
+		case 7:
+			pattern_sub(pat(bd), pat(bd), &table7[(*md[pos])(bd)]);
+			break;
+		case 6:
+			pattern_sub(pat(bd), pat(bd), &table6[(*md[pos])(bd)]);
+			break;
+		case 5:
+			pattern_sub(pat(bd), pat(bd), &table5[(*md[pos])(bd)]);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if(which == ANTIDIAG && op == SUBTRACT)
+	{
+		switch(ad_len[pos])
+		{
+		case 15:
+			pattern_sub(pat(bd), pat(bd), &table15[(*ad[pos])(bd)]);
+			break;
+		case 14:
+			pattern_sub(pat(bd), pat(bd), &table14[(*ad[pos])(bd)]);
+			break;
+		case 13:
+			pattern_sub(pat(bd), pat(bd), &table13[(*ad[pos])(bd)]);
+			break;
+		case 12:
+			pattern_sub(pat(bd), pat(bd), &table12[(*ad[pos])(bd)]);
+			break;
+		case 11:
+			pattern_sub(pat(bd), pat(bd), &table11[(*ad[pos])(bd)]);
+			break;
+		case 10:
+			pattern_sub(pat(bd), pat(bd), &table10[(*ad[pos])(bd)]);
+			break;
+		case 9:
+			pattern_sub(pat(bd), pat(bd), &table9[(*ad[pos])(bd)]);
+			break;
+		case 8:
+			pattern_sub(pat(bd), pat(bd), &table8[(*ad[pos])(bd)]);
+			break;
+		case 7:
+			pattern_sub(pat(bd), pat(bd), &table7[(*ad[pos])(bd)]);
+			break;
+		case 6:
+			pattern_sub(pat(bd), pat(bd), &table6[(*ad[pos])(bd)]);
+			break;
+		case 5:
+			pattern_sub(pat(bd), pat(bd), &table5[(*ad[pos])(bd)]);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if(which == MAINDIAG && op == ADD)
+	{
+		switch(md_len[pos])
+		{
+		case 15:
+			pattern_add(pat(bd), pat(bd), &table15[(*md[pos])(bd)]);
+			break;
+		case 14:
+			pattern_add(pat(bd), pat(bd), &table14[(*md[pos])(bd)]);
+			break;
+		case 13:
+			pattern_add(pat(bd), pat(bd), &table13[(*md[pos])(bd)]);
+			break;
+		case 12:
+			pattern_add(pat(bd), pat(bd), &table12[(*md[pos])(bd)]);
+			break;
+		case 11:
+			pattern_add(pat(bd), pat(bd), &table11[(*md[pos])(bd)]);
+			break;
+		case 10:
+			pattern_add(pat(bd), pat(bd), &table10[(*md[pos])(bd)]);
+			break;
+		case 9:
+			pattern_add(pat(bd), pat(bd), &table9[(*md[pos])(bd)]);
+			break;
+		case 8:
+			pattern_add(pat(bd), pat(bd), &table8[(*md[pos])(bd)]);
+			break;
+		case 7:
+			pattern_add(pat(bd), pat(bd), &table7[(*md[pos])(bd)]);
+			break;
+		case 6:
+			pattern_add(pat(bd), pat(bd), &table6[(*md[pos])(bd)]);
+			break;
+		case 5:
+			pattern_add(pat(bd), pat(bd), &table5[(*md[pos])(bd)]);
+			break;
+		default:
+			break;
+		}
+	}
+
+	if(which == ANTIDIAG && op == ADD)
+	{
+		switch(ad_len[pos])
+		{
+		case 15:
+			pattern_add(pat(bd), pat(bd), &table15[(*ad[pos])(bd)]);
+			break;
+		case 14:
+			pattern_add(pat(bd), pat(bd), &table14[(*ad[pos])(bd)]);
+			break;
+		case 13:
+			pattern_add(pat(bd), pat(bd), &table13[(*ad[pos])(bd)]);
+			break;
+		case 12:
+			pattern_add(pat(bd), pat(bd), &table12[(*ad[pos])(bd)]);
+			break;
+		case 11:
+			pattern_add(pat(bd), pat(bd), &table11[(*ad[pos])(bd)]);
+			break;
+		case 10:
+			pattern_add(pat(bd), pat(bd), &table10[(*ad[pos])(bd)]);
+			break;
+		case 9:
+			pattern_add(pat(bd), pat(bd), &table9[(*ad[pos])(bd)]);
+			break;
+		case 8:
+			pattern_add(pat(bd), pat(bd), &table8[(*ad[pos])(bd)]);
+			break;
+		case 7:
+			pattern_add(pat(bd), pat(bd), &table7[(*ad[pos])(bd)]);
+			break;
+		case 6:
+			pattern_add(pat(bd), pat(bd), &table6[(*ad[pos])(bd)]);
+			break;
+		case 5:
+			pattern_add(pat(bd), pat(bd), &table5[(*ad[pos])(bd)]);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 void board_reset(board_t* bd)
 {
 	int i;
@@ -693,6 +1874,34 @@ u8 board_gameover(const board_t* bd)
 	return false;
 }
 
+void do_move_no_mvlist(board_t* bd, const u8 pos, const u8 color)
+{
+	if(bd->arr[pos] != EMPTY || color == EMPTY)
+		return;
+
+	bd->num++;
+
+	// subtract critical line patterns from the old pattern
+	pattern_copy(&bd->pat[bd->num - 1], pat(bd));
+	pattern_sub(pat(bd), pat(bd), &table15[(*r[pos])(bd)]);
+	pattern_sub(pat(bd), pat(bd), &table15[(*c[pos])(bd)]);
+	diag_helper(bd, MAINDIAG, SUBTRACT, pos);
+	diag_helper(bd, ANTIDIAG, SUBTRACT, pos);
+	
+	// make move
+	bd->arr[pos] = color;
+	mvlist_insert_back(mstk(bd), pos);
+
+	// add new critical line patterns
+	pattern_add(pat(bd), pat(bd), &table15[(*r[pos])(bd)]);
+	pattern_add(pat(bd), pat(bd), &table15[(*c[pos])(bd)]);
+	diag_helper(bd, MAINDIAG, ADD, pos);
+	diag_helper(bd, ANTIDIAG, ADD, pos);
+
+	// update pinc
+	pattern_sub(hpinc(bd), pat(bd), &bd->pat[bd->num - 1]);
+}
+
 void do_move(board_t* bd, const u8 pos, const u8 color)
 {
 	if(bd->arr[pos] != EMPTY || color == EMPTY)
@@ -702,20 +1911,20 @@ void do_move(board_t* bd, const u8 pos, const u8 color)
 
 	// subtract old critical line patterns
 	pattern_copy(&bd->pat[bd->num - 1], pat(bd));
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], DEC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], DEC);
+	pattern_sub(pat(bd), pat(bd), &table15[(*r[pos])(bd)]);
+	pattern_sub(pat(bd), pat(bd), &table15[(*c[pos])(bd)]);
+	diag_helper(bd, MAINDIAG, SUBTRACT, pos);
+	diag_helper(bd, ANTIDIAG, SUBTRACT, pos);
 	
 	// make move
 	bd->arr[pos] = color;
 	mvlist_insert_back(mstk(bd), pos);
 
 	// add new critical line patterns
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], INC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], INC);
+	pattern_add(pat(bd), pat(bd), &table15[(*r[pos])(bd)]);
+	pattern_add(pat(bd), pat(bd), &table15[(*c[pos])(bd)]);
+	diag_helper(bd, MAINDIAG, ADD, pos);
+	diag_helper(bd, ANTIDIAG, ADD, pos);
 
 	// update pinc
 	pattern_sub(pinc(bd), pat(bd), &bd->pat[bd->num - 1]);
@@ -729,67 +1938,8 @@ void do_move(board_t* bd, const u8 pos, const u8 color)
 		if(nei[pos][i] == INVALID)
 			break;
 		if(bd->arr[nei[pos][i]] == EMPTY)
-		{
-			mvlist_remove(mlist(bd), nei[pos][i]);
 			mvlist_insert_front(mlist(bd), nei[pos][i]);
-		}
 	}
-}
-
-void do_move_no_mvlist(board_t* bd, const u8 pos, const u8 color)
-{
-	if(bd->arr[pos] != EMPTY || color == EMPTY)
-		return;
-	
-	bd->num++;
-
-	// subtract old critical line patterns
-	pattern_copy(&bd->pat[bd->num - 1], pat(bd));
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], DEC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], DEC);
-	
-	// make move
-	bd->arr[pos] = color;
-	mvlist_insert_back(mstk(bd), pos);
-
-	// add new critical line patterns
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], INC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], INC);
-
-	// update hpinc
-	pattern_sub(hpinc(bd), pat(bd), &bd->pat[bd->num - 1]);
-}
-
-void do_move_no_mvlist_pinc(board_t* bd, const u8 pos, const u8 color)
-{
-	if(bd->arr[pos] != EMPTY || color == EMPTY)
-		return;
-	
-	bd->num++;
-
-	// subtract old critical line patterns
-	pattern_copy(&bd->pat[bd->num - 1], pat(bd));
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, DEC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], DEC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], DEC);
-	
-	// make move
-	bd->arr[pos] = color;
-	mvlist_insert_back(mstk(bd), pos);
-
-	// add new critical line patterns
-	line_pattern_lookup(pat(bd), (*r[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*c[pos])(bd), 15, INC);
-	line_pattern_lookup(pat(bd), (*md[pos])(bd), md_len[pos], INC);
-	line_pattern_lookup(pat(bd), (*ad[pos])(bd), ad_len[pos], INC);
-
-	// update pinc
-	pattern_sub(pinc(bd), pat(bd), &bd->pat[bd->num - 1]);
 }
 
 void undo(board_t* bd)

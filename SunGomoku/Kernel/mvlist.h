@@ -3,9 +3,9 @@
  *                   / /______  ________
  *  developed by    /____  / / / / __  /
  *                 _____/ / /_/ / / / /
- *  2019.2        /______/_____/_/ /_/
+ *  2019.1        /______/_____/_/ /_/
  *
- * mvlist.h - mvlist_t data structure implementation
+ * mvlist.h - implementation of mvlist_t data structure
  *
  * Similar to a double-ended linked list with no repetition.
  * The time complexity of each operation is O(1) if not mentioned.

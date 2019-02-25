@@ -63,7 +63,7 @@ public:
         xrRoom->setCentralWidget(centralwidget);
         menubar = new QMenuBar(xrRoom);
         menubar->setObjectName(QString::fromUtf8("menubar"));
-        menubar->setGeometry(QRect(0, 0, 640, 22));
+        menubar->setGeometry(QRect(0, 0, 640, 21));
         menuOption = new QMenu(menubar);
         menuOption->setObjectName(QString::fromUtf8("menuOption"));
         xrRoom->setMenuBar(menubar);
