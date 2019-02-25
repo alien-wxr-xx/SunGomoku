@@ -34,7 +34,7 @@
      <x>0</x>
      <y>0</y>
      <width>640</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuOption">
@@ -70,7 +70,7 @@
   </widget>
   <action name="actionRestart">
    <property name="icon">
-    <iconset resource="myicon.qrc">
+    <iconset resource="../Resources/myicon.qrc">
      <normaloff>:/myimages/restartV2.icns</normaloff>:/myimages/restartV2.icns</iconset>
    </property>
    <property name="text">
@@ -99,7 +99,7 @@
   </action>
   <action name="actionUndo">
    <property name="icon">
-    <iconset resource="myicon.qrc">
+    <iconset resource="../Resources/myicon.qrc">
      <normaloff>:/myimages/undoV2.icns</normaloff>:/myimages/undoV2.icns</iconset>
    </property>
    <property name="text">
@@ -111,7 +111,7 @@
   </action>
  </widget>
  <resources>
-  <include location="myicon.qrc"/>
+  <include location="../Resources/myicon.qrc"/>
  </resources>
  <connections/>
 </ui>
