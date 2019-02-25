@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
+<<<<<<< HEAD
 <!-- Written by QtCreator 4.8.1, 2019-02-19T22:16:17. -->
+=======
+<!-- Written by QtCreator 4.8.1, 2019-02-23T22:22:58. -->
+>>>>>>> 1f51999ad32dc8d610a18b7aadec0ab142a582c3
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -297,18 +301,30 @@
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DefaultDisplayName">SunGomoku</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName"></value>
+<<<<<<< HEAD
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:D:/My Design/Gomoku/SunGomoku/SunGomoku/SunGomoku.pro</value>
+=======
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">Qt4ProjectManager.Qt4RunConfiguration:/Users/xr/Documents/GitHub/SunGomoku/SunGomoku/SunGomoku.pro</value>
+>>>>>>> 1f51999ad32dc8d610a18b7aadec0ab142a582c3
     <value type="QString" key="Qt4ProjectManager.Qt4RunConfiguration.ProFile">SunGomoku.pro</value>
     <value type="QString" key="RunConfiguration.Arguments"></value>
     <value type="uint" key="RunConfiguration.QmlDebugServerPort">3768</value>
     <value type="bool" key="RunConfiguration.UseCppDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
+<<<<<<< HEAD
+=======
+    <value type="bool" key="RunConfiguration.UseDyldImageSuffix">false</value>
+>>>>>>> 1f51999ad32dc8d610a18b7aadec0ab142a582c3
     <value type="bool" key="RunConfiguration.UseLibrarySearchPath">true</value>
     <value type="bool" key="RunConfiguration.UseMultiProcess">false</value>
     <value type="bool" key="RunConfiguration.UseQmlDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseQmlDebuggerAuto">true</value>
     <value type="QString" key="RunConfiguration.WorkingDirectory"></value>
+<<<<<<< HEAD
     <value type="QString" key="RunConfiguration.WorkingDirectory.default">D:/My Design/Gomoku/SunGomoku/build-SunGomoku-Desktop_Qt_5_12_1_MinGW_64_bit-Release</value>
+=======
+    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/Users/xr/Documents/GitHub/SunGomoku/Build SunGomoku for Mac/SunGomoku.app/Contents/MacOS</value>
+>>>>>>> 1f51999ad32dc8d610a18b7aadec0ab142a582c3
    </valuemap>
    <value type="int" key="ProjectExplorer.Target.RunConfigurationCount">1</value>
   </valuemap>
